@@ -3,6 +3,7 @@ import '../widgets/function_button.dart';
 import '../widgets/pitch_dial.dart';
 import '../widgets/scene_pads_1.dart';
 import '../widgets/scene_pads_2.dart';
+import '../core/engine/audio_engine.dart';
 
 
 
@@ -14,6 +15,7 @@ class HomeScreen extends StatefulWidget{
 }
 
 class _HomeScreenState extends State<HomeScreen>{
+  final Engine _engine = Engine(); // shared audio engine for every pad
 
   bool _loopOn = false;
   bool _echoOn = false;
@@ -27,6 +29,13 @@ class _HomeScreenState extends State<HomeScreen>{
       _pitch = 0.0;
     });
   }
+
+  @override
+  void dispose() {
+    _engine.dispose();
+    super.dispose();
+  }
+  
 
   @override
   Widget build(BuildContext context){
@@ -50,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen>{
                         // 4x4 pad grid — switches between SC1 and SC2
                         Expanded(
                           flex: 4,
-                          child: _scene == 1 ? const ScenePads1() : const ScenePads2(),
+                          child: _scene == 1 ? ScenePads1(engine: _engine, pitch: _pitch) : ScenePads2(engine: _engine, pitch: _pitch),
                         ),
 
                         // right column: pitch dial

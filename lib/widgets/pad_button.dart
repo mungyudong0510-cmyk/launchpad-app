@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import '../core/engine/audio_engine.dart';
 
 
 
 class PadButton extends StatefulWidget{
+  final Engine engine;
   final Color color;
   final String? soundPath;
+  final double pitch;
 
   const PadButton({
     super.key,
+    required this.engine,
     required this.color,
     this.soundPath,
+    this.pitch = 0.0  
   });
 
   @override //for debugging purposes don't remove it took me ages to figure out why the buttons weren't working;; goodie shittt but you can deleted this if you want, it won't affect the functionality of the codes
@@ -19,8 +24,22 @@ class PadButton extends StatefulWidget{
 class _PadButtonState extends State<PadButton>{
   bool _pressed = false;
 
+  @override
+  void initState() {
+    super.initState();
+    final path = widget.soundPath;
+    if (path != null) {
+      widget.engine.loadSample(path, path);
+    }
+  }
+
   void _onTapDown(TapDownDetails _){
     setState(() => _pressed = true);
+    final path = widget.soundPath;
+    if (path != null) {
+      final pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
+      widget.engine.playTrack(path, pitch: pitchFactor);
+    }
   }
 
   void _onTapEnd() {

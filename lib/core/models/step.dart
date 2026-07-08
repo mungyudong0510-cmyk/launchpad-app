@@ -1,9 +1,9 @@
 class Step {
-  bool status;
+  bool active;
   double volume;
   double pitch;
   Step({
-    this.status = false,
+    this.active = false,
     this.volume = 1.0,
     this.pitch = 0,
   });
