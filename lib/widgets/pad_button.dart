@@ -14,7 +14,7 @@ class PadButton extends StatefulWidget{
     required this.engine,
     required this.color,
     this.soundPath,
-    this.pitch = 0.0  
+    this.pitch = 0.0
   });
 
   @override //for debugging purposes don't remove it took me ages to figure out why the buttons weren't working;; goodie shittt but you can deleted this if you want, it won't affect the functionality of the codes
@@ -33,12 +33,21 @@ class _PadButtonState extends State<PadButton>{
     }
   }
 
+  @override
+  void didUpdateWidget(PadButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // pre-apply pitch whenever dial changes so tap has no extra work
+    if (oldWidget.pitch != widget.pitch && widget.soundPath != null) {
+      final pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
+      widget.engine.preSetPitch(widget.soundPath!, pitchFactor);
+    }
+  }
+
   void _onTapDown(TapDownDetails _){
     setState(() => _pressed = true);
     final path = widget.soundPath;
     if (path != null) {
-      final pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
-      widget.engine.playTrack(path, pitch: pitchFactor);
+      widget.engine.playTrack(path); // pitch already pre-applied via didUpdateWidget
     }
   }
 

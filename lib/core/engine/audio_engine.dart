@@ -57,20 +57,23 @@ class Engine {
     }
   }
 
-  Future<void> playTrack(String trackID, {double? volume, double? pitch}) async {
+  // fire-and-forget everything so tap → sound is instant
+  void playTrack(String trackID, {double? volume, double? pitch}) {
     final player = _players[trackID];
     if (player == null) return;
     try {
-      final setup = <Future<void>>[
-        if (volume != null) player.setVolume(volume.clamp(0.0, 1.0)),
-        if (pitch != null) player.setPitch(pitch.clamp(0.25, 4.0)),
-      ];
-      if (setup.isNotEmpty) await Future.wait(setup);
-      await player.seek(Duration.zero);
+      if (volume != null) unawaited(player.setVolume(volume.clamp(0.0, 1.0)));
+      if (pitch != null) unawaited(player.setPitch(pitch.clamp(0.25, 4.0)));
+      unawaited(player.seek(Duration.zero));
       unawaited(player.play());
     } catch (e) {
       debugPrint('Engine: could not play "$trackID": $e');
     }
+  }
+
+  // pre-apply pitch when dial changes so it's ready before next tap
+  void preSetPitch(String trackID, double pitch) {
+    unawaited(_players[trackID]?.setPitch(pitch.clamp(0.25, 4.0)));
   }
 
   Future<void> stopTrack(String trackID) async {
