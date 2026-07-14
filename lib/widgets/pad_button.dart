@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/engine/audio_engine.dart';
-
+import '../core/engine/recorder.dart';
 
 
 class PadButton extends StatefulWidget{
   final Engine engine;
   final Color color;
+  final Recorder? recorder;
   final String? soundPath;
   final double pitch;
 
@@ -13,6 +14,7 @@ class PadButton extends StatefulWidget{
     super.key,
     required this.engine,
     required this.color,
+    this.recorder,
     this.soundPath,
     this.pitch = 0.0
   });
@@ -23,6 +25,7 @@ class PadButton extends StatefulWidget{
 
 class _PadButtonState extends State<PadButton>{
   bool _pressed = false;
+  double _pitchFactor = 1.0;
 
   @override
   void initState() {
@@ -30,6 +33,7 @@ class _PadButtonState extends State<PadButton>{
     final path = widget.soundPath;
     if (path != null) {
       widget.engine.loadSample(path, path);
+      _pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
     }
   }
 
@@ -48,6 +52,7 @@ class _PadButtonState extends State<PadButton>{
     final path = widget.soundPath;
     if (path != null) {
       widget.engine.playTrack(path); // pitch already pre-applied via didUpdateWidget
+      widget.recorder?.capture(path, pitch: _pitchFactor);
     }
   }
 
