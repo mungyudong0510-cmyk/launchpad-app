@@ -34,8 +34,11 @@ class _PadButtonState extends State<PadButton>{
     super.initState();
     final path = widget.soundPath;
     if (path != null) {
-      unawaited(widget.engine.loadSample(path, path));
       _pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(widget.engine.loadSample(path, path));
+      });
     }
   }
 
