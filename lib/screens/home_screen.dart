@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/dj_bok_logo.dart';
 import '../widgets/function_button.dart';
 import '../widgets/pitch_dial.dart';
 import '../widgets/scene_pads_1.dart';
@@ -65,13 +66,20 @@ class _HomeScreenState extends State<HomeScreen>{
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: Column(
-                children: [
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            children: [
+              const SizedBox(
+                height: 86,
+                child: Center(child: DjBokLogo()),
+              ),
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Column(
+                      children: [
 
                   // top section: 4x4 pads + right pitch dial
                   Expanded(
@@ -156,9 +164,12 @@ class _HomeScreenState extends State<HomeScreen>{
                       )),
                     ]),
                   ),
-                ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
