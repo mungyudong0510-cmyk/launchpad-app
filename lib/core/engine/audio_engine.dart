@@ -1,10 +1,15 @@
 import 'dart:async';
-import 'package:just_audio/just_audio.dart';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
 import '../models/pattern.dart';
 
 class Engine {
-  final Map<String, AudioPlayer> _players = {};
+  static const MethodChannel _channel = MethodChannel('launchpad_app/sound_pool');
+
+  final Map<String, String> _loadedAssets = {};
+  final Map<String, Future<void>> _loadingAssets = {};
   bool playing = false;
   int currentStep = 0;
   double _bpm = 120.0;
@@ -19,70 +24,69 @@ class Engine {
     _bpm = newBpm.clamp(20.0, 300.0);
   }
 
-  AudioPlayer _playerFor(String trackID) =>
-      _players.putIfAbsent(trackID, () => AudioPlayer());
-
   Future<void> init(Pattern pattern) async {
     for (final track in pattern.tracks) {
       final sample = track.sample;
       if (sample != null) {
         await loadSample(track.id, sample.filePath);
-      } else {
-        _playerFor(track.id);
       }
     }
   }
 
   Future<void> loadSample(String trackID, String filePath) async {
-    final player = _playerFor(trackID);
-    try {
-      await player.setAsset(filePath);
-      await _primePlayer(player);
-    } catch (e) {
+    if (_loadedAssets[trackID] == filePath) return;
+
+    final currentLoad = _loadingAssets[trackID];
+    if (currentLoad != null) return currentLoad;
+
+    final loadFuture = _channel.invokeMethod<void>('load', {
+      'trackID': trackID,
+      'filePath': filePath,
+    }).then((_) {
+      _loadedAssets[trackID] = filePath;
+    }).catchError((e) {
       debugPrint('Error loading sample for track $trackID: $e');
-    }
+    }).whenComplete(() {
+      _loadingAssets.remove(trackID);
+    });
+
+    _loadingAssets[trackID] = loadFuture;
+    return loadFuture;
   }
 
-  Future<void> _primePlayer(AudioPlayer player) async {
-    try {
-      final originalVolume = player.volume;
-      await player.setVolume(0.0);
-      await player.seek(Duration.zero);
-      await player.play();
-      await player.pause();
-      await player.seek(Duration.zero);
-      await player.setVolume(originalVolume);
-    } catch (e) {
-      debugPrint('Error priming player: $e');
-    }
-  }
-
-  // fire-and-forget everything so tap → sound is instant
+  // fire-and-forget everything so tap -> sound is instant
   void playTrack(String trackID, {double? volume, double? pitch}) {
-    final player = _players[trackID];
-    if (player == null) return;
-    try {
-      if (volume != null) unawaited(player.setVolume(volume.clamp(0.0, 1.0)));
-      if (pitch != null) unawaited(player.setPitch(pitch.clamp(0.25, 4.0)));
-      unawaited(player.seek(Duration.zero));
-      unawaited(player.play());
-    } catch (e) {
-      debugPrint('Engine: could not play "$trackID": $e');
+    final loading = _loadingAssets[trackID];
+    if (loading != null) {
+      unawaited(loading.then((_) {
+        _playLoaded(trackID, volume: volume, pitch: pitch);
+      }));
+      return;
     }
+
+    _playLoaded(trackID, volume: volume, pitch: pitch);
+  }
+
+  void _playLoaded(String trackID, {double? volume, double? pitch}) {
+    if (_loadedAssets[trackID] == null) return;
+
+    unawaited(_channel.invokeMethod<void>('play', {
+      'trackID': trackID,
+      'volume': (volume ?? 1.0).clamp(0.0, 1.0).toDouble(),
+      'pitch': (pitch ?? 1.0).clamp(0.5, 2.0).toDouble(),
+    }).catchError((e) {
+      debugPrint('Engine: could not play "$trackID": $e');
+    }));
   }
 
   // pre-apply pitch when dial changes so it's ready before next tap
-  void preSetPitch(String trackID, double pitch) {
-    unawaited(_players[trackID]?.setPitch(pitch.clamp(0.25, 4.0)));
-  }
+  void preSetPitch(String trackID, double pitch) {}
 
   Future<void> stopTrack(String trackID) async {
-    await _players[trackID]?.stop();
+    await _channel.invokeMethod<void>('stop', {'trackID': trackID});
   }
 
-  Future<void> setTrackVolume(String trackID, double volume) async {
-    await _players[trackID]?.setVolume(volume.clamp(0.0, 1.0));
-  }
+  Future<void> setTrackVolume(String trackID, double volume) async {}
 
   void start(Pattern pattern) {
     if (playing) return;
@@ -113,7 +117,7 @@ class Engine {
         playTrack(
           track.id,
           volume: (step.volume * track.volume).clamp(0.0, 1.0),
-          pitch: (1.0 + step.pitch).clamp(0.25, 4.0),
+          pitch: (1.0 + step.pitch).clamp(0.5, 2.0),
         );
       }
     }
@@ -127,16 +131,13 @@ class Engine {
     currentStep = 0;
     _timer?.cancel();
     _clock.stop();
-    for (final player in _players.values) {
-      player.stop();
-    }
+    unawaited(_channel.invokeMethod<void>('stopAll'));
   }
 
   void dispose() {
     _timer?.cancel();
-    for (final player in _players.values) {
-      player.dispose();
-    }
-    _players.clear();
+    unawaited(_channel.invokeMethod<void>('dispose'));
+    _loadedAssets.clear();
+    _loadingAssets.clear();
   }
 }

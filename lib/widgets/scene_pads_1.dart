@@ -50,7 +50,7 @@ class ScenePads1 extends StatelessWidget{
         Expanded(child: PadButton(engine: engine, recorder: recorder, pitch: pitch,color: const Color(0xFF00E676), soundPath: 'assets/sounds/scene1/Crash1.wav')),
         Expanded(child: PadButton(engine: engine, recorder: recorder, pitch: pitch,color: const Color(0xFF69F0AE), soundPath: 'assets/sounds/scene1/Chant.wav')),
         Expanded(child: PadButton(engine: engine, recorder: recorder, pitch: pitch,color: const Color(0xFF40C4FF), soundPath: 'assets/sounds/scene1/Bleep.wav')),
-        Expanded(child: PadButton(engine: engine, recorder: recorder, pitch: pitch,color: const Color(0xFF82B1FF), soundPath: 'assets/sounds/scene1/Shaker.wav')),
+        Expanded(child: PadButton(engine: engine, recorder: recorder, pitch: pitch,color: const Color(0xFF82B1FF), soundPath: 'assets/sounds/scene1/Cowbell.wav')),
       ])),
     ]);
   }
