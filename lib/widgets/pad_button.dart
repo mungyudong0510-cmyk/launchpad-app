@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../core/engine/audio_engine.dart';
 import '../core/engine/recorder.dart';
@@ -32,7 +34,7 @@ class _PadButtonState extends State<PadButton>{
     super.initState();
     final path = widget.soundPath;
     if (path != null) {
-      widget.engine.loadSample(path, path);
+      unawaited(widget.engine.loadSample(path, path));
       _pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
     }
   }
@@ -43,6 +45,7 @@ class _PadButtonState extends State<PadButton>{
     // pre-apply pitch whenever dial changes so tap has no extra work
     if (oldWidget.pitch != widget.pitch && widget.soundPath != null) {
       final pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
+      _pitchFactor = pitchFactor;
       widget.engine.preSetPitch(widget.soundPath!, pitchFactor);
     }
   }
@@ -51,15 +54,18 @@ class _PadButtonState extends State<PadButton>{
     setState(() => _pressed = true);
     final path = widget.soundPath;
     if (path != null) {
-      widget.engine.playTrack(path); // pitch already pre-applied via didUpdateWidget
+      widget.engine.playTrack(
+        path,
+        pitch: _pitchFactor,
+      ); // pitch already pre-applied before the tap
       widget.recorder?.capture(path, pitch: _pitchFactor);
     }
   }
 
   void _onTapEnd() {
-    Future.delayed(const Duration(milliseconds: 100),( ){ //100ms for glow effect duration
+    unawaited(Future.delayed(const Duration(milliseconds: 100),( ){ //100ms for glow effect duration
       if (mounted) setState(() => _pressed = false);
-    });
+    }));
   }
 
   @override

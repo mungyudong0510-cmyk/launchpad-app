@@ -90,7 +90,7 @@ class PitchDial extends StatelessWidget {
                     top: 5,
                     left: 0, right: 0,
                     child: Text(
-                      'PITCH',
+                      'VOL',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.3),

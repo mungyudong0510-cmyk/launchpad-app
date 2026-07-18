@@ -1,13 +1,11 @@
 import 'dart:async';
+import 'dart:math';
+
 import 'audio_engine.dart';
 
-/// A single captured pad tap: which track, how far into the take it landed,
-/// and the volume/pitch that were actually in effect at tap time (so loop
-/// playback sounds exactly like the take, even if the pitch dial moves
-/// afterwards).
 class RecordedHit {
   final String trackID;
-  final int timeMs; // offset from the start of the recording
+  final int timeMs;
   final double volume;
   final double pitch;
 
@@ -19,54 +17,45 @@ class RecordedHit {
   });
 }
 
-/// Records live pad taps into a take, then loops that take back on a
-/// repeating cycle. Loop playback runs alongside live pad taps rather than
-/// blocking them — both funnel through the same [Engine], so a live tap and
-/// a looped hit on the same pad just retrigger the same player.
 class Recorder {
   final Engine engine;
   Recorder(this.engine);
 
-  static const int _driverIntervalMs = 10; // loop-playback scan resolution
+  static const int _driverIntervalMs = 10;
+  static const int _defaultBeatMs = 500;
+  static const int _minimumLoopMs = 500;
 
   bool recording = false;
-  bool looping = false;
+  bool cueing = false;
 
   List<RecordedHit> _take = [];
   int _loopLengthMs = 0;
 
   final Stopwatch _recordClock = Stopwatch();
-
+  final Stopwatch _cueClock = Stopwatch();
   Timer? _loopDriver;
-  int _loopElapsedMs = 0; // ms into the current loop cycle
-  int _nextHitIndex = 0; // walks _take in order as the loop plays
+  int _nextHitIndex = 0;
 
   bool get hasTake => _take.isNotEmpty;
 
-  /// Starts capturing taps. Any previous take is discarded once this is
-  /// called — there is one take at a time. Stops loop playback first, since
-  /// recording a new take while the old one is looping would mix the two.
   void startRecording() {
     if (recording) return;
-    stopLoop();
+    stopCue();
     _take = [];
+    _loopLengthMs = 0;
     recording = true;
     _recordClock
       ..reset()
       ..start();
   }
 
-  /// Stops capturing. The take is kept (even if empty) so [hasTake] reflects
-  /// whether there's anything to loop.
   void stopRecording() {
     if (!recording) return;
     recording = false;
     _recordClock.stop();
-    _loopLengthMs = _recordClock.elapsedMilliseconds;
+    _finalizeLoopLength();
   }
 
-  /// Called by a pad on tap-down. No-ops when not recording, so pads can
-  /// always call this unconditionally.
   void capture(String trackID, {double volume = 1.0, double pitch = 1.0}) {
     if (!recording) return;
     _take.add(RecordedHit(
@@ -77,55 +66,137 @@ class Recorder {
     ));
   }
 
-  /// Starts looping the current take. No-ops if there's nothing recorded
-  /// yet, or the loop is zero-length (e.g. stopped instantly after starting).
-  void startLoop() {
-    if (looping || recording) return;
+  void startCue() {
+    if (cueing || recording) return;
     if (_take.isEmpty || _loopLengthMs <= 0) return;
-    looping = true;
-    _loopElapsedMs = 0;
+
+    cueing = true;
     _nextHitIndex = 0;
+    _cueClock
+      ..reset()
+      ..start();
+
+    _playDueHits(0);
     _loopDriver = Timer.periodic(
       const Duration(milliseconds: _driverIntervalMs),
       (_) => _driveLoop(),
     );
   }
 
-  void stopLoop() {
-    looping = false;
+  void stopCue() {
+    cueing = false;
     _loopDriver?.cancel();
     _loopDriver = null;
+    _cueClock.stop();
+    _nextHitIndex = 0;
   }
 
-  void toggleLoop() {
-    if (looping) {
-      stopLoop();
+  void toggleCue() {
+    if (cueing) {
+      stopCue();
     } else {
-      startLoop();
+      startCue();
     }
   }
 
-  void _driveLoop() {
-    _loopElapsedMs += _driverIntervalMs;
+  void clear() {
+    stopCue();
+    recording = false;
+    _recordClock.stop();
+    _take = [];
+    _loopLengthMs = 0;
+  }
 
-    // Fire every hit whose recorded offset falls within the slice of the
-    // loop we just crossed. Walking an index forward (rather than filtering
-    // the whole list each tick) keeps this cheap even for long takes.
+  void _driveLoop() {
+    if (!cueing) return;
+
+    final elapsedMs = _cueClock.elapsedMilliseconds;
+    _playDueHits(elapsedMs);
+
+    if (elapsedMs >= _loopLengthMs) {
+      _cueClock
+        ..reset()
+        ..start();
+      _nextHitIndex = 0;
+      _playDueHits(0);
+    }
+  }
+
+  void _playDueHits(int elapsedMs) {
     while (_nextHitIndex < _take.length &&
-        _take[_nextHitIndex].timeMs <= _loopElapsedMs) {
+        _take[_nextHitIndex].timeMs <= elapsedMs) {
       final hit = _take[_nextHitIndex];
       engine.playTrack(hit.trackID, volume: hit.volume, pitch: hit.pitch);
       _nextHitIndex++;
     }
+  }
 
-    if (_loopElapsedMs >= _loopLengthMs) {
-      _loopElapsedMs = 0;
-      _nextHitIndex = 0;
+  void _finalizeLoopLength() {
+    if (_take.isEmpty) {
+      _loopLengthMs = 0;
+      return;
     }
+
+    final firstHitMs = _take.first.timeMs;
+    _take = _take
+        .map((hit) => RecordedHit(
+              trackID: hit.trackID,
+              timeMs: hit.timeMs - firstHitMs,
+              volume: hit.volume,
+              pitch: hit.pitch,
+            ))
+        .toList();
+
+    final beatMs = _estimateBeatMs();
+    final wrapGapMs = _estimateWrapGapMs(beatMs);
+    final lastHitMs = _take.last.timeMs;
+    final musicalTailMs = lastHitMs + wrapGapMs;
+
+    _loopLengthMs = max(musicalTailMs, _minimumLoopMs);
+  }
+
+  int _estimateBeatMs() {
+    if (_take.length < 2) return _defaultBeatMs;
+
+    final gaps = <int>[];
+    for (var i = 1; i < _take.length; i++) {
+      final gap = _take[i].timeMs - _take[i - 1].timeMs;
+      if (gap >= 80 && gap <= 2000) gaps.add(gap);
+    }
+
+    if (gaps.isEmpty) return _defaultBeatMs;
+
+    gaps.sort();
+    final medianGap = gaps[gaps.length ~/ 2];
+    return medianGap.clamp(120, 1500).toInt();
+  }
+
+  int _estimateWrapGapMs(int fallbackGapMs) {
+    if (_take.length < 2) return fallbackGapMs;
+
+    final firstTrackID = _take.first.trackID;
+    final lastTrackID = _take.last.trackID;
+    final matchingGaps = <int>[];
+
+    for (var i = 0; i < _take.length - 1; i++) {
+      final from = _take[i];
+      final to = _take[i + 1];
+      if (from.trackID == lastTrackID && to.trackID == firstTrackID) {
+        final gap = to.timeMs - from.timeMs;
+        if (gap >= 80 && gap <= 2000) matchingGaps.add(gap);
+      }
+    }
+
+    if (matchingGaps.isEmpty) return fallbackGapMs;
+
+    matchingGaps.sort();
+    final medianGap = matchingGaps[matchingGaps.length ~/ 2];
+    return medianGap.clamp(120, 1500).toInt();
   }
 
   void dispose() {
     _loopDriver?.cancel();
     _recordClock.stop();
+    _cueClock.stop();
   }
 }

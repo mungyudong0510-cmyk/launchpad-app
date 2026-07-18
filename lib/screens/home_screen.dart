@@ -4,6 +4,7 @@ import '../widgets/pitch_dial.dart';
 import '../widgets/scene_pads_1.dart';
 import '../widgets/scene_pads_2.dart';
 import '../core/engine/audio_engine.dart';
+import '../core/engine/recorder.dart';
 
 
 
@@ -16,22 +17,44 @@ class HomeScreen extends StatefulWidget{
 
 class _HomeScreenState extends State<HomeScreen>{
   final Engine _engine = Engine(); // shared audio engine for every pad
+  late final Recorder _recorder;
 
-  bool _loopOn = false;
-  bool _echoOn = false;
   double _pitch = 0.0; // -1.0 ~ 1.0, default 0 (center)
   int _scene = 1;      // active scene: 1 or 2
 
+  @override
+  void initState() {
+    super.initState();
+    _recorder = Recorder(_engine);
+  }
+
+  void _toggleLoopRecording() {
+    setState(() {
+      if (_recorder.recording) {
+        _recorder.stopRecording();
+      } else {
+        _recorder.startRecording();
+      }
+    });
+  }
+
+  void _toggleCue() {
+    if (!_recorder.hasTake) return;
+    setState(() {
+      _recorder.toggleCue();
+    });
+  }
+
   void _clearAll() {
     setState(() {
-      _loopOn = false;
-      _echoOn = false;
+      _recorder.clear();
       _pitch = 0.0;
     });
   }
 
   @override
   void dispose() {
+    _recorder.dispose();
     _engine.dispose();
     super.dispose();
   }
@@ -59,7 +82,17 @@ class _HomeScreenState extends State<HomeScreen>{
                         // 4x4 pad grid — switches between SC1 and SC2
                         Expanded(
                           flex: 4,
-                          child: _scene == 1 ? ScenePads1(engine: _engine, pitch: _pitch) : ScenePads2(engine: _engine, pitch: _pitch),
+                          child: _scene == 1
+                              ? ScenePads1(
+                                  engine: _engine,
+                                  recorder: _recorder,
+                                  pitch: _pitch,
+                                )
+                              : ScenePads2(
+                                  engine: _engine,
+                                  recorder: _recorder,
+                                  pitch: _pitch,
+                                ),
                         ),
 
                         // right column: pitch dial
@@ -102,17 +135,17 @@ class _HomeScreenState extends State<HomeScreen>{
                         color: const Color(0xFFFF4081),
                         label: 'Loop',
                         isToggle: true,
-                        isActive: _loopOn,
-                        onChanged: (val) => setState(() => _loopOn = val),
+                        isActive: _recorder.recording,
+                        onChanged: (_) => _toggleLoopRecording(),
                       )),
 
                       //──────────[echo toggle button]──────────
                       Expanded(child: FunctionButton(
-                        color: const Color(0xFFFF4081),
-                        label: 'Echo',
+                        color: const Color(0xFFFFD740),
+                        label: 'CUE',
                         isToggle: true,
-                        isActive: _echoOn,
-                        onChanged: (val) => setState(() => _echoOn = val),
+                        isActive: _recorder.cueing,
+                        onChanged: (_) => _toggleCue(),
                       )),
 
                       // ──────────[clear button]──────────
