@@ -58,6 +58,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/images/
     - assets/sounds/scene1/
     - assets/sounds/scene2/
 

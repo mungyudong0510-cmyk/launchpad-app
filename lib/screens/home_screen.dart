@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/dj_bok_logo.dart';
+import '../widgets/dj_bqk_logo.dart';
 import '../widgets/function_button.dart';
 import '../widgets/pitch_dial.dart';
 import '../widgets/scene_pads_1.dart';
@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen>{
             children: [
               const SizedBox(
                 height: 86,
-                child: Center(child: DjBokLogo()),
+                child: Center(child: DjBqkLogo()),
               ),
               Expanded(
                 child: Center(
