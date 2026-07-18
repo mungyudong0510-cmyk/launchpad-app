@@ -7,13 +7,12 @@ class RecordedHit {
   final String trackID;
   final int timeMs;
   final double volume;
-  final double pitch;
+
 
   RecordedHit({
     required this.trackID,
     required this.timeMs,
     this.volume = 1.0,
-    this.pitch = 1.0,
   });
 }
 
@@ -56,13 +55,12 @@ class Recorder {
     _finalizeLoopLength();
   }
 
-  void capture(String trackID, {double volume = 1.0, double pitch = 1.0}) {
+  void capture(String trackID, {double volume = 1.0}) {
     if (!recording) return;
     _take.add(RecordedHit(
       trackID: trackID,
       timeMs: _recordClock.elapsedMilliseconds,
       volume: volume,
-      pitch: pitch,
     ));
   }
 
@@ -126,7 +124,7 @@ class Recorder {
     while (_nextHitIndex < _take.length &&
         _take[_nextHitIndex].timeMs <= elapsedMs) {
       final hit = _take[_nextHitIndex];
-      engine.playTrack(hit.trackID, volume: hit.volume, pitch: hit.pitch);
+      engine.playTrack(hit.trackID, volume: hit.volume);
       _nextHitIndex++;
     }
   }
@@ -143,7 +141,6 @@ class Recorder {
               trackID: hit.trackID,
               timeMs: hit.timeMs - firstHitMs,
               volume: hit.volume,
-              pitch: hit.pitch,
             ))
         .toList();
 

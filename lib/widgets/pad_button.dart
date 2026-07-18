@@ -10,7 +10,7 @@ class PadButton extends StatefulWidget{
   final Color color;
   final Recorder? recorder;
   final String? soundPath;
-  final double pitch;
+  final double volume;
 
   const PadButton({
     super.key,
@@ -18,7 +18,7 @@ class PadButton extends StatefulWidget{
     required this.color,
     this.recorder,
     this.soundPath,
-    this.pitch = 0.0
+    this.volume = 1.0
   });
 
   @override //for debugging purposes don't remove it took me ages to figure out why the buttons weren't working;; goodie shittt but you can deleted this if you want, it won't affect the functionality of the codes
@@ -27,14 +27,12 @@ class PadButton extends StatefulWidget{
 
 class _PadButtonState extends State<PadButton>{
   bool _pressed = false;
-  double _pitchFactor = 1.0;
 
   @override
   void initState() {
     super.initState();
     final path = widget.soundPath;
     if (path != null) {
-      _pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(widget.engine.loadSample(path, path));
@@ -42,16 +40,6 @@ class _PadButtonState extends State<PadButton>{
     }
   }
 
-  @override
-  void didUpdateWidget(PadButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // pre-apply pitch whenever dial changes so tap has no extra work
-    if (oldWidget.pitch != widget.pitch && widget.soundPath != null) {
-      final pitchFactor = (1.0 + widget.pitch).clamp(0.5, 2.0);
-      _pitchFactor = pitchFactor;
-      widget.engine.preSetPitch(widget.soundPath!, pitchFactor);
-    }
-  }
 
   void _onTapDown(TapDownDetails _){
     setState(() => _pressed = true);
@@ -59,9 +47,9 @@ class _PadButtonState extends State<PadButton>{
     if (path != null) {
       widget.engine.playTrack(
         path,
-        pitch: _pitchFactor,
-      ); // pitch already pre-applied before the tap
-      widget.recorder?.capture(path, pitch: _pitchFactor);
+        volume: widget.volume,
+      );
+      widget.recorder?.capture(path, volume: widget.volume);
     }
   }
 

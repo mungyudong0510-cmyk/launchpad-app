@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
  
-
-
-class PitchDial extends StatelessWidget {
-  final double value;           // -1.0 ~ 1.0 (0.0 = center, default)
+ 
+class VolumeDial extends StatelessWidget {
+  final double value;           // 0.0 ~ 1.0 (1.0 = full volume, default)
   final ValueChanged<double>? onChanged;
   final double sensitivity;     // [drag sensitivity] added it just for mouse drag;; its cancer to drag around without this function;; the delta setting in android studio is too low for this kind of drag, so i added this function to make it more sensitive and easier to use. you can change the value to depand on your preference yeee
-
-  const PitchDial({
+ 
+  const VolumeDial({
     super.key,
-    this.value = 0.0,
+    this.value = 1.0,
     this.onChanged,
     this.sensitivity = 6.0, // drag sensitivity — higher = faster
-
+ 
   });
-
+ 
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -23,14 +22,14 @@ class PitchDial extends StatelessWidget {
         builder: (context, constraints) {
           final h = constraints.maxHeight;
           final w = constraints.maxWidth;
-          // handle position: value=1.0 → top, value=0 → center, value=-1.0 → bottom
-          final handleTop = ((1 - value) / 2) * (h - 32);
-
+          // handle position: value=1.0 → top, value=0.0 → bottom
+          final handleTop = (1 - value) * (h - 32);
+ 
           return GestureDetector(
             onVerticalDragUpdate: (details) {
-              // drag up = positive, drag down = negative
+              // drag up = louder, drag down = quieter
               final delta = -details.delta.dy / h * sensitivity;
-              final newVal = (value + delta).clamp(-1.0, 1.0);
+              final newVal = (value + delta).clamp(0.0, 1.0);
               onChanged?.call(newVal);
             },
             child: Container(
@@ -51,16 +50,6 @@ class PitchDial extends StatelessWidget {
                     child: Container(
                       width: 2,
                       color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  // center line (0% reference)
-                  Positioned(
-                    top: h / 2 - 0.5,
-                    left: 8,
-                    right: 8,
-                    child: Container(
-                      height: 1,
-                      color: Colors.white.withValues(alpha: 0.2),
                     ),
                   ),
                   // handle
@@ -85,7 +74,7 @@ class PitchDial extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // PITCH label (top)
+                  // VOL label (top)
                   Positioned(
                     top: 5,
                     left: 0, right: 0,
