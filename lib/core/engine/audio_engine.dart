@@ -3,14 +3,23 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+// Picks audio_web_impl.dart on Chrome, audio_stub_impl.dart on Android/iOS.
+import 'audio_stub_impl.dart' if (dart.library.html) 'audio_web_impl.dart';
+
 
 class Engine {
+  // Native SoundPool channel — Android only.
   static const MethodChannel _channel = MethodChannel('launchpad_app/sound_pool');
 
   final Map<String, String> _loadedAssets = {};
   final Map<String, Future<void>> _loadingAssets = {};
 
   Future<void> loadSample(String trackID, String filePath) async {
+    if (kIsWeb) {
+      // Web: use browser HTML Audio API via audio_web_impl.dart
+      return webLoadSample(trackID, filePath);
+    }
+
     if (_loadedAssets[trackID] == filePath) return;
 
     final currentLoad = _loadingAssets[trackID];
@@ -33,6 +42,11 @@ class Engine {
 
   // fire-and-forget everything so tap -> sound is instant
   void playTrack(String trackID, {double? volume}) {
+    if (kIsWeb) {
+      webPlayTrack(trackID, volume: volume ?? 1.0);
+      return;
+    }
+
     final loading = _loadingAssets[trackID];
     if (loading != null) {
       unawaited(loading.then((_) {
@@ -56,6 +70,10 @@ class Engine {
   }
 
   void dispose() {
+    if (kIsWeb) {
+      webDispose();
+      return;
+    }
     unawaited(_channel.invokeMethod<void>('dispose'));
     _loadedAssets.clear();
     _loadingAssets.clear();
